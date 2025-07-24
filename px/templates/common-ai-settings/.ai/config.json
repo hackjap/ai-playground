@@ -1,0 +1,220 @@
+{
+  "project": {
+    "name": "{{projectName}}",
+    "description": "{{taskDescription}}",
+    "mainLanguage": "{{mainLanguage}}",
+    "version": "1.0.0",
+    "createdBy": "Project Starter CLI",
+    "createdAt": "{{timestamp}}"
+  },
+  
+  "aiTools": {
+    "github-copilot": {
+      "enabled": true,
+      "language": "{{mainLanguage}}",
+      "context": {
+        "projectType": "{{taskDescription}}",
+        "codeStyle": "clean-code",
+        "testingFramework": "jest-vitest",
+        "documentation": "jsdoc"
+      },
+      "preferences": {
+        "verbosity": "medium",
+        "explanations": true,
+        "codeComments": true,
+        "typeAnnotations": true
+      }
+    },
+    
+    "cursor": {
+      "enabled": true,
+      "rulesPath": ".cursor/rules/",
+      "defaultRules": [
+        "generate-test-code.md",
+        "refactor-logic.md",
+        "custom-rule-example.md"
+      ],
+      "context": {
+        "project": "{{projectName}}",
+        "language": "{{mainLanguage}}",
+        "purpose": "{{taskDescription}}"
+      }
+    },
+    
+    "claude": {
+      "enabled": true,
+      "promptsPath": "claude/",
+      "defaultPrompts": [
+        "code-review.md",
+        "debug-error.md", 
+        "document-function.md"
+      ],
+      "context": {
+        "project": "{{projectName}}",
+        "language": "{{mainLanguage}}",
+        "domain": "{{taskDescription}}"
+      }
+    },
+    
+    "chatgpt": {
+      "enabled": true,
+      "context": {
+        "role": "Senior {{mainLanguage}} Developer",
+        "project": "{{projectName}}",
+        "focus": "{{taskDescription}}",
+        "codeStyle": "clean-readable-maintainable"
+      },
+      "preferences": {
+        "responseFormat": "markdown",
+        "includeExamples": true,
+        "explainReasoning": true
+      }
+    },
+    
+    "codeium": {
+      "enabled": false,
+      "language": "{{mainLanguage}}",
+      "context": "{{projectName}} development"
+    },
+    
+    "tabnine": {
+      "enabled": false,
+      "language": "{{mainLanguage}}",
+      "teamLearning": false
+    }
+  },
+  
+  "codeGeneration": {
+    "style": "functional-clean",
+    "patterns": [
+      "single-responsibility",
+      "dry-principle",
+      "early-returns",
+      "meaningful-names"
+    ],
+    "testing": {
+      "framework": "jest",
+      "pattern": "arrange-act-assert",
+      "coverage": "minimum-80-percent",
+      "mockStrategy": "external-dependencies"
+    },
+    "documentation": {
+      "style": "jsdoc",
+      "includeExamples": true,
+      "includeTypeInfo": true,
+      "includeErrorCases": true
+    }
+  },
+  
+  "codeReview": {
+    "criteria": [
+      "readability",
+      "maintainability", 
+      "performance",
+      "security",
+      "testing"
+    ],
+    "focus": {
+      "language": "{{mainLanguage}}",
+      "domain": "{{taskDescription}}",
+      "project": "{{projectName}}"
+    },
+    "standards": {
+      "complexity": "cyclomatic-under-10",
+      "functionLength": "under-20-lines",
+      "parameterCount": "under-4-params",
+      "nestingDepth": "under-3-levels"
+    }
+  },
+  
+  "debugging": {
+    "approach": "systematic",
+    "steps": [
+      "reproduce-error",
+      "isolate-cause",
+      "analyze-context",
+      "propose-solution",
+      "prevent-recurrence"
+    ],
+    "logging": {
+      "level": "debug",
+      "includeStack": true,
+      "includeContext": true
+    }
+  },
+  
+  "refactoring": {
+    "triggers": [
+      "code-duplication",
+      "long-functions",
+      "complex-conditions",
+      "feature-envy",
+      "data-clumps"
+    ],
+    "principles": [
+      "solid",
+      "dry",
+      "kiss",
+      "yagni"
+    ],
+    "safety": {
+      "requireTests": true,
+      "incrementalChanges": true,
+      "codeReview": true
+    }
+  },
+  
+  "workflow": {
+    "development": {
+      "tdd": "preferred",
+      "commitMessages": "conventional-commits",
+      "branchNaming": "feature/description",
+      "codeReview": "mandatory"
+    },
+    "aiIntegration": {
+      "autoComplete": true,
+      "codeGeneration": true,
+      "documentation": true,
+      "testing": true,
+      "refactoring": true
+    }
+  },
+  
+  "projectSpecific": {
+    "language": "{{mainLanguage}}",
+    "framework": "auto-detect",
+    "buildTool": "auto-detect",
+    "testRunner": "auto-detect",
+    "linter": "auto-detect",
+    "formatter": "auto-detect"
+  },
+  
+  "quality": {
+    "metrics": {
+      "codeComplexity": "low",
+      "testCoverage": "high",
+      "documentation": "comprehensive",
+      "performance": "optimized"
+    },
+    "gates": {
+      "coverage": 80,
+      "complexity": 10,
+      "duplication": 5,
+      "maintainability": "A"
+    }
+  },
+  
+  "team": {
+    "conventions": {
+      "codeStyle": "prettier-eslint",
+      "naming": "camelCase-kebab-case",
+      "documentation": "inline-external",
+      "testing": "comprehensive"
+    },
+    "collaboration": {
+      "codeReview": "required",
+      "pairProgramming": "encouraged",
+      "knowledgeSharing": "documentation"
+    }
+  }
+} 
