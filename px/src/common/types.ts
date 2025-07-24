@@ -44,4 +44,14 @@ export interface SlashCommand {
   name: string;
   description: string;
   handler: CommandHandler;
+}
+
+/**
+ * TUI 프롬프트 응답 타입
+ */
+export interface ProjectPromptAnswers {
+  projectName: string;
+  template: string;
+  installDependencies: boolean;
+  gitInit: boolean;
 } 
