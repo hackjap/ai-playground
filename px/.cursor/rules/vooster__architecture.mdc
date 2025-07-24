@@ -1,0 +1,140 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# 기술 요구사항 문서 (TRD)
+
+## 1. Executive Technical Summary
+- **프로젝트 개요**: 본 문서는 "Project Starter CLI"의 기술적 요구사항을 정의합니다. 이 CLI 도구는 TypeScript 기반으로 개발되며, TUI(Text-based User Interface)를 통해 사용자 친화적인 경험을 제공합니다. 핵심 목표는 플러그인 기반 아키텍처를 통해 확장성을 확보하고, 반복적인 프로젝트 초기 설정 작업을 자동화하여 개발 생산성을 극대화하는 것입니다.
+- **핵심 기술 스택**: 주요 기술 스택은 Node.js 런타임 환경에서 실행되는 TypeScript입니다. CLI 명령어 구문 분석에는 `commander`, 대화형 TUI 구현에는 `ink`와 `inquirer`를 사용합니다. 이를 통해 강력하고 직관적인 CLI 애플리케이션을 구축합니다.
+- **주요 기술 목표**:
+  - **성능**: 평균 실행 시간을 30초 이내로 유지하여 신속한 프로젝트 생성을 보장합니다.
+  - **확장성**: NPM을 통해 배포되는 플러그인을 동적으로 로드하여 기능을 쉽게 확장할 수 있는 구조를 설계합니다.
+  - **호환성**: macOS, Linux, Windows 등 주요 운영체제에서 일관된 동작을 보장합니다.
+- **핵심 기술 가정**:
+  - 사용자는 자신의 로컬 환경에 Node.js (v18 LTS 이상) 및 Git이 사전 설치되어 있다고 가정합니다.
+  - CLI 도구 및 관련 플러그인의 주요 배포 채널은 NPM 레지스트리입니다.
+  - 파일 시스템 접근 권한은 CLI를 실행하는 사용자 계정의 권한을 따릅니다.
+
+## 2. Tech Stack
+
+| 카테고리 | 기술 / 라이브러리 | 선정 사유 |
+| --- | --- | --- |
+| 언어 | TypeScript (v5.x) | 정적 타이핑을 통해 코드의 안정성과 유지보수성을 높이고, 최신 JavaScript 기능을 활용하여 생산성을 향상시킵니다. |
+| 런타임 | Node.js (v18 LTS 이상) | PRD에 명시된 요구사항이며, 크로스플랫폼 CLI 개발에 가장 적합한 비동기 I/O 기반의 런타임 환경입니다. |
+| CLI 프레임워크 | Commander.js | 명령어, 옵션, 하위 명령어 구문 분석 및 자동 도움말 생성 기능이 강력하여 CLI 개발 표준으로 널리 사용됩니다. |
+| TUI 라이브러리 | Ink, Inquirer | `Ink`는 React와 유사한 선언적 방식으로 복잡한 TUI를 구성하는 데 사용되며, `Inquirer`는 순차적인 사용자 입력 프롬프트를 간단하게 구현하는 데 최적화되어 있습니다. 두 라이브러리를 조합하여 최상의 사용자 경험을 제공합니다. |
+| 테스트 프레임워크 | Vitest | ESM을 네이티브로 지원하고 설정이 간편하며 실행 속도가 빨라 TypeScript 기반 프로젝트의 단위/통합 테스트에 효율적입니다. |
+| 린팅 / 포맷팅 | ESLint, Prettier | 코드 스타일의 일관성을 강제하고 잠재적 오류를 사전에 방지하여 프로젝트 전반의 코드 품질을 유지합니다. |
+| 파일 시스템 처리 | fs-extra | Node.js 내장 `fs` 모듈을 확장하여 파일 복사, 디렉터리 생성 등 복잡한 파일 시스템 작업을 안정적이고 간편하게 처리합니다. |
+
+## 3. System Architecture Design
+
+### Top-Level building blocks
+- **CLI 코어 엔진 (CLI Core Engine)**: 애플리케이션의 진입점(entry point)으로, `commander`를 사용하여 입력된 명령어와 옵션을 파싱하고 전체 실행 흐름을 제어합니다. 하위 모듈(TUI, 템플릿, 플러그인)의 생명주기를 관리합니다.
+- **TUI 모듈 (TUI Module)**: `ink`와 `inquirer`를 사용하여 모든 대화형 사용자 인터페이스를 처리합니다. 프로젝트 유형 선택, 설정 병합 여부 확인 등 사용자 입력을 받아 CLI 코어 엔진으로 전달하는 역할을 담당합니다.
+- **템플릿 엔진 (Template Engine)**: 내장 또는 원격 저장소의 템플릿을 가져와 사용자 시스템에 복사하고, 변수(예: 프로젝트 이름)를 치환하는 등 템플릿 기반의 프로젝트 생성을 전담합니다.
+- **플러그인 관리자 (Plugin Manager)**: `px add <plugin>` 명령을 통해 설치된 NPM 패키지 기반의 플러그인을 탐색, 로드 및 실행합니다. 플러그인 간의 의존성 및 충돌을 관리하고, 정의된 생명주기 훅(hook)을 호출합니다.
+- **설정 관리자 (Configuration Manager)**: 프로젝트 루트의 설정 파일(예: `.projectstarterrc.json`)을 읽고 쓰며, 기존 설정과 신규 설정 간의 병합 로직을 처리합니다.
+- **슬래시 커맨드 실행기 (Slash Command Executor)**: `px /lint fix`와 같이 특정 컨텍스트에서 실행되는 단축 명령어를 파싱하고, 해당 기능을 담당하는 플러그인이나 내부 모듈에 실행을 위임합니다.
+
+### Top-Level Component Interaction Diagram
+```mermaid
+graph TD
+    subgraph 사용자 환경
+        A[사용자 (CLI 실행)]
+    end
+
+    subgraph "Project Starter CLI"
+        B[CLI 코어 엔진]
+        C[TUI 모듈]
+        D[템플릿 엔진]
+        E[플러그인 관리자]
+        F[슬래시 커맨드 실행기]
+    end
+
+    subgraph 외부 시스템
+        G[파일 시스템]
+        H[NPM 레지스트리]
+    end
+
+    A -- 명령어 입력 --> B
+    B -- 사용자 입력 요청 --> C
+    C -- 입력 결과 반환 --> B
+    B -- 'init' 요청 --> D
+    B -- 'add' 요청 --> E
+    B -- '/cmd' 요청 --> F
+    D -- 템플릿 파일 CRUD --> G
+    E -- 플러그인 로드/실행 --> D
+    E -- 플러그인 다운로드 --> H
+```
+
+- 사용자는 터미널을 통해 CLI 명령어를 입력하여 **CLI 코어 엔진**을 실행합니다.
+- **CLI 코어 엔진**은 명령어에 따라 필요한 사용자 입력을 받기 위해 **TUI 모듈**을 호출합니다.
+- `init`과 같은 생성 명령어의 경우, **템플릿 엔진**이 활성화되어 **파일 시스템**에 프로젝트 구조를 생성합니다.
+- `add` 명령어의 경우, **플러그인 관리자**가 **NPM 레지스트리**에서 플러그인을 다운로드하고, 플러그인 로직을 실행하여 기존 프로젝트 설정을 수정합니다.
+
+### Code Organization & Convention
+**Domain-Driven Organization Strategy**
+- **도메인 분리**: 코드베이스를 비즈니스 도메인(Bounded Context)을 기준으로 구성합니다. 예를 들어, 명령어 처리(`commands`), 플러그인 관리(`plugin`), 템플릿 처리(`template`), 사용자 인터페이스(`tui`) 등 기능적 책임에 따라 모듈을 분리합니다.
+- **계층 기반 아키텍처**: 각 도메인 내부는 표현(Presentation), 비즈니스 로직(Business Logic), 인프라(Infrastructure) 계층으로 분리하여 관심사를 명확히 합니다. 예를 들어, `tui`는 표현 계층, `template`의 로직은 비즈니스 로직, 파일 시스템 접근은 인프라 계층에 해당합니다.
+- **기능 기반 모듈**: 각 CLI 명령어(`init`, `add`)는 `commands` 디렉터리 내에 자체 파일/모듈로 그룹화하여 응집도를 높입니다.
+- **공유 컴포넌트**: 여러 도메인에서 공통으로 사용되는 유틸리티 함수, 타입 정의, 상수 등은 `common` 또는 `utils` 디렉터리에 배치하여 재사용성을 극대화합니다.
+
+**Universal File & Folder Structure**
+monorepo preference: X
+```
+/
+├── .github/              # CI/CD 워크플로우 (GitHub Actions)
+├── __tests__/            # 테스트 파일 (Vitest)
+│   ├── commands/
+│   └── plugin/
+├── templates/            # 내장 프로젝트 템플릿
+│   ├── node-basic/
+│   └── react-basic/
+├── src/                  # 소스 코드 루트
+│   ├── bin/              # 실행 파일 (shebang 스크립트)
+│   │   └── index.ts
+│   ├── commands/         # CLI 명령어 구현
+│   │   ├── init.ts
+│   │   └── add.ts
+│   ├── common/           # 공통 유틸리티 및 타입
+│   │   ├── constants.ts
+│   │   └── types.ts
+│   ├── core/             # CLI 핵심 로직 및 설정
+│   │   ├── config.ts
+│   │   └── error-handler.ts
+│   ├── plugin/           # 플러그인 관리자 로직
+│   │   └── manager.ts
+│   ├── template/         # 템플릿 엔진 로직
+│   │   └── engine.ts
+│   └── tui/              # TUI 컴포넌트 및 프롬프트
+│       ├── components/   # Ink 컴포넌트
+│       └── prompts.ts    # Inquirer 프롬프트
+├── .eslintrc.cjs
+├── package.json
+├── prettier.config.js
+└── tsconfig.json
+```
+
+### Data Flow & Communication Patterns
+- **사용자-CLI 통신**: 사용자의 명령어 입력으로 시작되는 동기적 요청/응답 패턴입니다. CLI는 TUI를 통해 추가 정보를 요청하고, 모든 작업이 완료된 후 결과를 터미널에 출력하고 종료합니다.
+- **데이터베이스 상호작용**: 별도의 데이터베이스를 사용하지 않습니다. 상태 정보는 로컬 파일 시스템(예: `package.json`, 생성된 설정 파일, 전역 설정 파일 `~/.projectstarterrc`)에 저장됩니다.
+- **외부 서비스 통합**: NPM 레지스트리와의 통신이 핵심입니다. `axios` 또는 `node-fetch`와 같은 HTTP 클라이언트를 사용하여 플러그인 패키지 정보를 조회하고 다운로드합니다. 모든 네트워크 요청은 타임아웃과 재시도 로직을 포함해야 합니다.
+- **실시간 통신**: 요구사항에 해당하지 않습니다.
+- **데이터 동기화**: 설정 파일 생성 시 기존 파일이 존재할 경우, '덮어쓰기', '병합', '건너뛰기' 옵션을 사용자에게 제공하여 데이터 일관성을 사용자가 직접 제어할 수 있도록 합니다. 병합 로직은 JSON 객체의 깊은 병합(deep merge)을 기본으로 합니다.
+
+## 4. Performance & Optimization Strategy
+
+- **비동기 처리**: 모든 파일 I/O 및 네트워크 요청은 `async/await`를 사용하여 비동기적으로 처리합니다. 이를 통해 작업 중 메인 스레드가 차단되는 것을 방지하고 TUI의 반응성을 유지합니다.
+- **모듈 지연 로딩(Lazy Loading)**: 각 명령어에 필요한 모듈은 해당 명령어가 실행될 때 동적으로 `import()` 하여 초기 구동 시간을 단축합니다. 예를 들어, `px add`를 실행할 때만 플러그인 관리자 모듈을 로드합니다.
+- **로컬 캐싱**: 원격 템플릿 목록이나 플러그인 메타데이터와 같이 자주 변경되지 않는 데이터는 로컬 파일 시스템에 일정 시간(예: 24시간) 캐싱하여 반복 실행 시 네트워크 요청을 최소화하고 실행 속도를 향상시킵니다.
+- **효율적인 파일 처리**: 대용량 템플릿을 복사할 때는 개별 파일 읽기/쓰기 대신 `fs-extra`의 `copy`와 같은 최적화된 함수를 사용하여 I/O 오버헤드를 줄입니다.
+
+## 5. Implementation Roadmap & Milestones
+### Phase 1: Foundation (MVP Implementation)
+- **코어 인프라**: TypeScript 프로젝트 설정, `commander`를 이용한 기본 명령어 구조 구현, `vitest` 테스트 환경 구축.
+- **필수 기능**: `px init` 명령어 구현. React, Node.js 기본 템플릿 2종 제공. `inquirer`를 사용한 기본 TUI 프롬프트(프로젝트 이름 등) 구현. `.eslintrc`, `tsconfig.json` 등 핵심 설정 파일 자동 생성 기능.
+- **기본 보안**: `npm audit`을 CI 파이프라인에 통합하여 의존성 취약점을 점검합니다.
+- **개발 환경**: GitHub Actions를 통해 Pull Request 시 린트 및 테스트를 자동 실행하는 기본

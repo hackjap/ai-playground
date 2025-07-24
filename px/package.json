@@ -1,0 +1,53 @@
+{
+  "name": "px",
+  "version": "1.0.0",
+  "description": "Project Starter CLI - TypeScript 기반 프로젝트 초기 설정 자동화 도구",
+  "main": "dist/bin/index.js",
+  "bin": {
+    "px": "./dist/bin/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/bin/index.js",
+    "dev": "ts-node src/bin/index.ts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "project-starter",
+    "typescript",
+    "template",
+    "development-tools"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.8",
+    "@types/node": "^24.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^9.31.0",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "fs-extra": "^11.3.0",
+    "ink": "^6.0.1",
+    "inquirer": "^12.8.2",
+    "react": "^19.1.0"
+  }
+}
