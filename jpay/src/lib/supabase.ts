@@ -41,9 +41,16 @@ const ANONYMOUS_USER_KEY = 'jpay_anonymous_user_id'
 export function getAnonymousUserId(): string {
   let userId = localStorage.getItem(ANONYMOUS_USER_KEY)
   
+  // 기존 잘못된 형식의 ID가 있으면 제거
+  if (userId && userId.length > 36) {
+    localStorage.removeItem(ANONYMOUS_USER_KEY)
+    userId = null
+  }
+  
   if (!userId) {
-    // UUID v4 형식의 익명 ID 생성
-    userId = 'anon_' + crypto.randomUUID()
+    // 짧은 익명 ID 생성 (36자 제한에 맞도록)
+    const randomString = crypto.randomUUID().replace(/-/g, '').substring(0, 28)
+    userId = 'anon_' + randomString
     localStorage.setItem(ANONYMOUS_USER_KEY, userId)
   }
   

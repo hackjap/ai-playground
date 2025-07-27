@@ -9,8 +9,8 @@ CREATE TABLE pairs (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   
   -- 두 사용자의 익명 식별자
-  user1_id VARCHAR(36) NOT NULL,
-  user2_id VARCHAR(36),
+  user1_id VARCHAR(50) NOT NULL,
+  user2_id VARCHAR(50),
   
   -- 페어 설정
   pair_name VARCHAR(50) DEFAULT '우리',
@@ -34,7 +34,7 @@ CREATE TABLE expenses (
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
   
   -- 결제자 및 분담
-  paid_by VARCHAR(36) NOT NULL, -- user1_id 또는 user2_id
+  paid_by VARCHAR(50) NOT NULL, -- user1_id 또는 user2_id
   split_ratio DECIMAL(3,2) DEFAULT 0.50 CHECK (split_ratio >= 0 AND split_ratio <= 1), -- 0.5 = 50:50
   
   -- 카테고리 및 태그

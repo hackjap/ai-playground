@@ -1,7 +1,9 @@
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Welcome() {
+  const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md space-y-8">
@@ -58,10 +60,17 @@ export default function Welcome() {
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          <Button className="w-full h-12 text-lg">
+          <Button 
+            className="w-full h-12 text-lg"
+            onClick={() => navigate('/dashboard')}
+          >
             새 페어룸 만들기
           </Button>
-          <Button variant="outline" className="w-full h-12 text-lg">
+          <Button 
+            variant="outline" 
+            className="w-full h-12 text-lg"
+            onClick={() => navigate('/dashboard')}
+          >
             초대 코드로 참가하기
           </Button>
         </div>
