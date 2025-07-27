@@ -1,4 +1,3 @@
-import React from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Home, PieChart, List, Settings } from 'lucide-react'

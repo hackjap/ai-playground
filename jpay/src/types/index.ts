@@ -6,6 +6,48 @@ export interface User {
   isMe: boolean
 }
 
+// Supabase Database Types
+export interface DatabasePair {
+  id: string
+  invite_code: string
+  created_at: string
+  updated_at: string
+  user1_id: string
+  user2_id: string | null
+  pair_name: string
+  currency: string
+}
+
+export interface DatabaseExpense {
+  id: string
+  pair_id: string
+  created_at: string
+  updated_at: string
+  amount: number
+  title: string
+  description: string | null
+  expense_date: string
+  paid_by: string
+  split_ratio: number
+  category: string
+  receipt_url: string | null
+  memo: string | null
+  is_settled: boolean
+  settled_at: string | null
+}
+
+export interface DatabaseBudget {
+  id: string
+  pair_id: string
+  created_at: string
+  updated_at: string
+  budget_year: number
+  budget_month: number
+  total_budget: number | null
+  category_budgets: Record<string, number>
+  alert_threshold: number
+}
+
 export interface Expense {
   id: string
   amount: number
