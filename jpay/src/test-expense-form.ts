@@ -173,9 +173,9 @@ function testCategoryMapping() {
 
 // 브라우저 window 객체에 함수 등록
 if (typeof window !== 'undefined') {
-  (window as any).runExpenseFormTests = runExpenseFormTests
-  (window as any).testCategoryMapping = testCategoryMapping
-  (window as any).testSplitCalculations = testSplitCalculations
+  (window as any).runExpenseFormTests = runExpenseFormTests;
+  (window as any).testCategoryMapping = testCategoryMapping;
+  (window as any).testSplitCalculations = testSplitCalculations;
 }
 
 export { runExpenseFormTests, testCategoryMapping, testSplitCalculations }

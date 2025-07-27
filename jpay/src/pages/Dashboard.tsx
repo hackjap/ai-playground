@@ -4,16 +4,21 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
-import { createPair, getExpenses, getAnonymousUserId } from '@/lib/supabase'
-import type { DatabaseExpense } from '@/types'
+import { createPair, getAnonymousUserId } from '@/lib/supabase'
 import ExpenseForm from '@/components/forms/ExpenseForm'
+import CategoryChart from '@/components/charts/CategoryChart'
+import TrendChart from '@/components/charts/TrendChart'
+import { analyzeExpenses } from '@/utils/chartData'
+import { useExpenses, useInvalidateExpenses } from '@/hooks/useExpenses'
 
 export default function Dashboard() {
   const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false)
   const [pairId, setPairId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [expenses, setExpenses] = useState<DatabaseExpense[]>([])
-  const [isLoadingExpenses, setIsLoadingExpenses] = useState(false)
+  
+  // React Query를 사용한 데이터 fetching
+  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(pairId)
+  const invalidateExpenses = useInvalidateExpenses()
   
   // 페어 생성 또는 로드
   useEffect(() => {
@@ -44,57 +49,25 @@ export default function Dashboard() {
     initializePair()
   }, [])
 
-  // 지출 데이터 로드
-  const loadExpenses = async () => {
-    if (!pairId) return
-    
-    setIsLoadingExpenses(true)
-    try {
-      const expenseData = await getExpenses(pairId)
-      setExpenses(expenseData)
-    } catch (error) {
-      console.error('지출 데이터 로드 실패:', error)
-    } finally {
-      setIsLoadingExpenses(false)
-    }
-  }
-
-  // 페어 ID가 설정되면 지출 데이터 로드
-  useEffect(() => {
-    if (pairId) {
-      loadExpenses()
-    }
-  }, [pairId])
-
   const handleExpenseSuccess = () => {
     setIsExpenseFormOpen(false)
-    // 지출 등록 후 데이터 새로고침
-    loadExpenses()
+    // 지출 등록 후 데이터 새로고침 (React Query 캐시 무효화)
+    if (pairId) {
+      invalidateExpenses(pairId)
+    }
   }
 
   // 통계 계산
   const currentUserId = getAnonymousUserId()
   const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
   
-  const monthlyExpenses = expenses.filter(expense => 
-    expense.expense_date.startsWith(currentMonth)
-  )
+  // 차트 데이터 분석
+  const expenseAnalysis = analyzeExpenses(expenses || [], currentUserId, currentMonth)
+  const { totalAmount, categoryData, monthlyTrend, balance } = expenseAnalysis
   
-  const totalAmount = monthlyExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-  const myExpenses = monthlyExpenses.filter(expense => expense.paid_by === currentUserId)
-  const myTotalAmount = myExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  // 기존 계산들 (호환성 유지)
+  const myOwedAmount = balance
   
-  // 잔액 계산 (내가 낸 금액 - 내 분담금)
-  const myOwedAmount = monthlyExpenses.reduce((sum, expense) => {
-    if (expense.paid_by === currentUserId) {
-      // 내가 낸 경우: 내가 낸 금액 - 내 분담금
-      return sum + (expense.amount - (expense.amount * expense.split_ratio))
-    } else {
-      // 상대방이 낸 경우: 내 분담금만큼 빚
-      return sum - (expense.amount * (1 - expense.split_ratio))
-    }
-  }, 0)
-
   // 임시 예산 (실제로는 budgets 테이블에서 가져와야 함)
   const monthlyBudget = 800000
   const budgetPercentage = Math.round((totalAmount / monthlyBudget) * 100)
@@ -103,17 +76,12 @@ export default function Dashboard() {
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayStr = yesterday.toISOString().split('T')[0]
-  const yesterdayAmount = expenses
+  const yesterdayAmount = (expenses || [])
     .filter(expense => expense.expense_date === yesterdayStr)
     .reduce((sum, expense) => sum + expense.amount, 0)
 
-  // 카테고리별 집계
-  const categoryTotals: Record<string, number> = {}
-  monthlyExpenses.forEach(expense => {
-    categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount
-  })
-  const topCategory = Object.entries(categoryTotals)
-    .sort(([,a], [,b]) => b - a)[0]?.[0] || '없음'
+  // 가장 많이 쓴 카테고리
+  const topCategory = categoryData.length > 0 ? categoryData[0].label : '없음'
 
   const quickStats = [
     { label: '이번 달 총 지출', value: formatCurrency(totalAmount) },
@@ -123,7 +91,7 @@ export default function Dashboard() {
   ]
 
   // 최근 지출 (최대 3개)
-  const recentExpenses = expenses.slice(0, 3).map(expense => ({
+  const recentExpenses = (expenses || []).slice(0, 3).map(expense => ({
     description: expense.title,
     amount: expense.amount,
     payer: expense.paid_by === currentUserId ? '나' : '상대방',
@@ -201,6 +169,23 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Charts Section */}
+      {totalAmount > 0 && (
+        <>
+          {/* Category Chart */}
+          <CategoryChart 
+            data={categoryData} 
+            title="이번 달 카테고리별 지출"
+          />
+          
+          {/* Trend Chart */}
+          <TrendChart 
+            data={monthlyTrend} 
+            title="최근 6개월 지출 트렌드"
+          />
+        </>
+      )}
 
       {/* Recent Expenses */}
       <Card>
