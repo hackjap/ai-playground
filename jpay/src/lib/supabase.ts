@@ -254,3 +254,22 @@ export async function settleExpenses(pairId: string, expenseIds: string[]) {
   
   return data
 }
+
+// 현재 미정산 지출 모두 정산 처리
+export async function settleAllCurrentExpenses(pairId: string) {
+  const { data, error } = await supabase
+    .from('expenses')
+    .update({ 
+      is_settled: true, 
+      settled_at: new Date().toISOString() 
+    })
+    .eq('pair_id', pairId)
+    .eq('is_settled', false)
+    .select()
+  
+  if (error) {
+    throw new Error(`전체 정산 처리 실패: ${error.message}`)
+  }
+  
+  return data
+}

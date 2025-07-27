@@ -1,24 +1,33 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
-import { createPair, getAnonymousUserId } from '@/lib/supabase'
+import { createPair, getAnonymousUserId, settleAllCurrentExpenses } from '@/lib/supabase'
 import ExpenseForm from '@/components/forms/ExpenseForm'
+import BudgetForm from '@/components/forms/BudgetForm'
 import CategoryChart from '@/components/charts/CategoryChart'
 import TrendChart from '@/components/charts/TrendChart'
+import { BudgetProgress } from '@/components/ui/gauge-bar'
 import { analyzeExpenses } from '@/utils/chartData'
 import { useExpenses, useInvalidateExpenses } from '@/hooks/useExpenses'
+import { useBudget, useInvalidateBudget, useBudgetAnalysis } from '@/hooks/useBudget'
+import SettlementModal from '@/components/modals/SettlementModal'
+import HistoryList from '@/components/history/HistoryList'
+import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 
 export default function Dashboard() {
   const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false)
+  const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(false)
+  const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false)
   const [pairId, setPairId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   
   // React Query를 사용한 데이터 fetching
   const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(pairId)
+  const { data: currentBudget, isLoading: isLoadingBudget } = useBudget(pairId)
   const invalidateExpenses = useInvalidateExpenses()
+  const invalidateBudget = useInvalidateBudget()
   
   // 페어 생성 또는 로드
   useEffect(() => {
@@ -57,6 +66,28 @@ export default function Dashboard() {
     }
   }
 
+  const handleBudgetSuccess = () => {
+    setIsBudgetFormOpen(false)
+    // 예산 설정 후 데이터 새로고침
+    if (pairId) {
+      invalidateBudget(pairId)
+    }
+  }
+
+  const handleSettlement = async () => {
+    if (!pairId) return
+    
+    try {
+      await settleAllCurrentExpenses(pairId)
+      // 정산 후 데이터 새로고침
+      invalidateExpenses(pairId)
+      setIsSettlementModalOpen(false)
+    } catch (error) {
+      console.error('정산 처리 실패:', error)
+      alert('정산 처리에 실패했습니다. 다시 시도해주세요.')
+    }
+  }
+
   // 통계 계산
   const currentUserId = getAnonymousUserId()
   const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
@@ -65,12 +96,11 @@ export default function Dashboard() {
   const expenseAnalysis = analyzeExpenses(expenses || [], currentUserId, currentMonth)
   const { totalAmount, categoryData, monthlyTrend, balance } = expenseAnalysis
   
+  // 예산 분석
+  const budgetAnalysis = useBudgetAnalysis(currentBudget, totalAmount)
+  
   // 기존 계산들 (호환성 유지)
   const myOwedAmount = balance
-  
-  // 임시 예산 (실제로는 budgets 테이블에서 가져와야 함)
-  const monthlyBudget = 800000
-  const budgetPercentage = Math.round((totalAmount / monthlyBudget) * 100)
 
   // 어제 지출 계산
   const yesterday = new Date()
@@ -86,7 +116,12 @@ export default function Dashboard() {
   const quickStats = [
     { label: '이번 달 총 지출', value: formatCurrency(totalAmount) },
     { label: '어제 지출', value: formatCurrency(yesterdayAmount) },
-    { label: '예산 대비 사용률', value: `${budgetPercentage}%` },
+    { 
+      label: '예산 대비 사용률', 
+      value: budgetAnalysis.hasBudget 
+        ? `${Math.round(budgetAnalysis.spentPercentage)}%`
+        : '예산 미설정'
+    },
     { label: '가장 많은 카테고리', value: topCategory },
   ]
 
@@ -128,9 +163,19 @@ export default function Dashboard() {
           <div className="text-3xl font-bold text-primary-600 mb-2">
             {formatCurrency(Math.abs(myOwedAmount))}
           </div>
-          <p className="text-slate-600">
+          <p className="text-slate-600 mb-4">
             {myOwedAmount >= 0 ? '받을 금액' : '줄 금액'}
           </p>
+          {Math.abs(myOwedAmount) > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setIsSettlementModalOpen(true)}
+              className="bg-white/50 hover:bg-white/80"
+            >
+              정산하기
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -146,27 +191,54 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Budget Progress */}
+      {/* Budget Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">월 예산</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">월 예산</CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setIsBudgetFormOpen(true)}
+              disabled={isLoadingBudget}
+            >
+              {budgetAnalysis.hasBudget ? '수정' : '설정'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex justify-between text-sm">
-              <span>{formatCurrency(totalAmount)}</span>
-              <span>{formatCurrency(monthlyBudget)}</span>
+          {budgetAnalysis.hasBudget ? (
+            <div className="space-y-4">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>사용: {formatCurrency(budgetAnalysis.spentAmount)}</span>
+                <span>예산: {formatCurrency(budgetAnalysis.budgetAmount)}</span>
+              </div>
+              <BudgetProgress 
+                spent={budgetAnalysis.spentAmount}
+                budget={budgetAnalysis.budgetAmount}
+                alertThreshold={budgetAnalysis.alertThreshold}
+              />
+              {budgetAnalysis.isOverBudget && (
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                  ⚠️ 예산을 {formatCurrency(budgetAnalysis.spentAmount - budgetAnalysis.budgetAmount)} 초과했습니다
+                </div>
+              )}
+              {budgetAnalysis.isNearAlert && !budgetAnalysis.isOverBudget && (
+                <div className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">
+                  ⚠️ 예산의 {budgetAnalysis.alertThreshold}%에 도달했습니다
+                </div>
+              )}
             </div>
-            <Progress 
-              value={budgetPercentage} 
-              variant={budgetPercentage > 80 ? 'danger' : budgetPercentage > 60 ? 'warning' : 'default'}
-            />
-            <div className="text-center">
-              <Badge variant={budgetPercentage > 80 ? 'destructive' : 'secondary'}>
-                {budgetPercentage}% 사용
-              </Badge>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground mb-4">
+                이번 달 예산을 설정하여 지출을 관리해보세요
+              </div>
+              <Button onClick={() => setIsBudgetFormOpen(true)}>
+                예산 설정하기
+              </Button>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -187,38 +259,14 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Recent Expenses */}
-      <Card>
-        <CardHeader>
-          <CardTitle>최근 지출</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {isLoadingExpenses ? (
-            <div className="text-center py-4 text-slate-500">
-              지출 내역을 불러오는 중...
-            </div>
-          ) : recentExpenses.length === 0 ? (
-            <div className="text-center py-4 text-slate-500">
-              아직 등록된 지출이 없습니다.
-            </div>
-          ) : (
-            recentExpenses.map((expense, index) => (
-              <div key={index} className="flex justify-between items-center">
-                <div>
-                  <div className="font-medium">{expense.description}</div>
-                  <Badge variant="outline" className="text-xs mt-1">
-                    {expense.category}
-                  </Badge>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold">{formatCurrency(expense.amount)}</div>
-                  <div className="text-sm text-slate-500">{expense.payer}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      {/* History List */}
+      <HistoryList
+        expenses={expenses || []}
+        currentUserId={currentUserId}
+        isLoading={isLoadingExpenses}
+        showSettleButton={Math.abs(myOwedAmount) > 0}
+        onSettleClick={() => setIsSettlementModalOpen(true)}
+      />
 
       {/* FAB */}
       <Button 
@@ -237,6 +285,29 @@ export default function Dashboard() {
           onSuccess={handleExpenseSuccess}
         />
       )}
+
+      {/* Budget Form Modal */}
+      {isBudgetFormOpen && (
+        <BudgetForm
+          pairId={pairId}
+          currentBudget={currentBudget}
+          onClose={() => setIsBudgetFormOpen(false)}
+          onSuccess={handleBudgetSuccess}
+        />
+      )}
+
+      {/* Settlement Modal */}
+      {isSettlementModalOpen && (
+        <SettlementModal
+          balance={myOwedAmount}
+          currentUserId={currentUserId}
+          onConfirm={handleSettlement}
+          onClose={() => setIsSettlementModalOpen(false)}
+        />
+      )}
+
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   )
 }

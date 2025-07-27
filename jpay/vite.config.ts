@@ -13,6 +13,12 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    allowedHosts: [
+      'm1-web.jdog.cloud',
+      'localhost',
+      '127.0.0.1',
+      '.jdog.cloud' // jdog.cloud 서브도메인 전체 허용
+    ],
   },
   build: {
     outDir: 'dist',
