@@ -3,6 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Layout from '@/components/layout/Layout'
 import Welcome from '@/pages/Welcome'
 import Dashboard from '@/pages/Dashboard'
+import Goals from '@/pages/Goals'
+import GoalDetail from '@/pages/GoalDetail'
+import GoalNew from '@/pages/GoalNew'
+import GoalEdit from '@/pages/GoalEdit'
 
 // React Query 클라이언트 설정
 const queryClient = new QueryClient({
@@ -23,6 +27,10 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Welcome />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="goals" element={<Goals />} />
+            <Route path="goals/new" element={<GoalNew />} />
+            <Route path="goals/:id" element={<GoalDetail />} />
+            <Route path="goals/:id/edit" element={<GoalEdit />} />
             <Route path="budget" element={<div className="p-4 text-center">예산 관리 페이지 (준비중)</div>} />
             <Route path="expenses" element={<div className="p-4 text-center">지출 내역 페이지 (준비중)</div>} />
             <Route path="settings" element={<div className="p-4 text-center">설정 페이지 (준비중)</div>} />
