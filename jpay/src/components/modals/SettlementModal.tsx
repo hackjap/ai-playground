@@ -12,7 +12,7 @@ interface SettlementModalProps {
 
 export default function SettlementModal({
   balance,
-  currentUserId,
+  currentUserId: _currentUserId, // eslint-disable-line @typescript-eslint/no-unused-vars
   onConfirm,
   onClose
 }: SettlementModalProps) {

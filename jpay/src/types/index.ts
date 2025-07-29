@@ -48,6 +48,29 @@ export interface DatabaseBudget {
   alert_threshold: number
 }
 
+export interface DatabaseGoal {
+  id: string
+  pair_id: string
+  created_at: string
+  updated_at: string
+  name: string
+  target_amount: number
+  deadline: string | null
+  icon_url: string | null
+  is_completed: boolean
+  completed_at: string | null
+}
+
+export interface DatabaseSavingsLog {
+  id: string
+  goal_id: string
+  created_at: string
+  updated_at: string
+  amount: number
+  date: string
+  memo: string | null
+}
+
 export interface Expense {
   id: string
   amount: number
@@ -85,12 +108,35 @@ export interface Budget {
   endDate: string
 }
 
+export interface Goal {
+  id: string
+  name: string
+  targetAmount: number
+  deadline?: string // ISO string
+  iconUrl?: string
+  isCompleted: boolean
+  completedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SavingsLog {
+  id: string
+  goalId: string
+  amount: number
+  date: string // ISO string
+  memo?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface PairRoom {
   id: string
   code: string
   users: User[]
   expenses: Expense[]
   budgets: Budget[]
+  goals: Goal[]
   createdAt: string
   lastActivityAt: string
 }

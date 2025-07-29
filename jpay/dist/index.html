@@ -3,36 +3,88 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#3b82f6" />
     <meta name="description" content="커플, 친구, 룸메이트를 위한 간편한 공유 가계부 앱" />
     
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/manifest.json" />
+    
+    <!-- iOS PWA 최적화 -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="PairPay" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="apple-touch-startup-image" href="/icon-512.png" />
+    
+    <!-- 모바일 터치 최적화 -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="msapplication-TileColor" content="#3b82f6" />
+    <meta name="msapplication-tap-highlight" content="no" />
     
     <title>PairPay - 우리 둘만의 가계부</title>
-    <script type="module" crossorigin src="/assets/index-D3dNvFty.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CX726FUP.css">
+    <script type="module" crossorigin src="/assets/index-BdSo_glo.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-VRLdBJ1m.css">
   </head>
   <body>
     <div id="root"></div>
     
     <!-- PWA Service Worker -->
     <script>
+      // PWA 서비스 워커 등록 및 설치 프롬프트
+      let deferredPrompt;
+      
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
               console.log('SW registered: ', registration);
+              
+              // 업데이트 감지
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // 새 버전 사용 가능 알림
+                    if (confirm('새 버전이 사용 가능합니다. 새로고침하시겠습니까?')) {
+                      window.location.reload();
+                    }
+                  }
+                });
+              });
             })
             .catch((registrationError) => {
               console.log('SW registration failed: ', registrationError);
             });
         });
       }
+      
+      // PWA 설치 프롬프트 처리
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // 설치 가능 상태를 전역으로 알림
+        window.dispatchEvent(new Event('pwa-installable'));
+      });
+      
+      // PWA 설치 함수
+      window.installPWA = async () => {
+        if (!deferredPrompt) return false;
+        
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        
+        return outcome === 'accepted';
+      };
+      
+      // PWA 설치 상태 확인
+      window.isPWAInstalled = () => {
+        return window.matchMedia('(display-mode: standalone)').matches ||
+               window.navigator.standalone === true;
+      };
     </script>
   </body>
 </html>

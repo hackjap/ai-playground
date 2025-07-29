@@ -125,13 +125,6 @@ export default function Dashboard() {
     { label: '가장 많은 카테고리', value: topCategory },
   ]
 
-  // 최근 지출 (최대 3개)
-  const recentExpenses = (expenses || []).slice(0, 3).map(expense => ({
-    description: expense.title,
-    amount: expense.amount,
-    payer: expense.paid_by === currentUserId ? '나' : '상대방',
-    category: expense.category,
-  }))
 
   // 로딩 중일 때 표시
   if (isLoading || !pairId) {

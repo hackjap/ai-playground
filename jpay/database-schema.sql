@@ -114,6 +114,55 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- 4. Goals 테이블 (공동 저축 목표)
+CREATE TABLE goals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  -- 목표 기본 정보
+  name VARCHAR(100) NOT NULL,
+  target_amount DECIMAL(12,2) NOT NULL CHECK (target_amount > 0),
+  deadline DATE,
+  icon_url TEXT,
+  
+  -- 목표 상태
+  is_completed BOOLEAN DEFAULT FALSE,
+  completed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 5. Savings Logs 테이블 (저축 내역)
+CREATE TABLE savings_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  goal_id UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  -- 저축 내역 정보
+  amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  memo TEXT
+);
+
+-- 추가 인덱스 생성
+CREATE INDEX idx_goals_pair_id ON goals(pair_id);
+CREATE INDEX idx_goals_is_completed ON goals(is_completed);
+CREATE INDEX idx_goals_deadline ON goals(deadline);
+
+CREATE INDEX idx_savings_logs_goal_id ON savings_logs(goal_id);
+CREATE INDEX idx_savings_logs_date ON savings_logs(date);
+
+-- RLS 설정 (goals, savings_logs)
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE savings_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable all operations for anonymous users" ON goals
+  FOR ALL USING (true);
+
+CREATE POLICY "Enable all operations for anonymous users" ON savings_logs
+  FOR ALL USING (true);
+
 -- 트리거 적용
 CREATE TRIGGER update_pairs_updated_at 
   BEFORE UPDATE ON pairs 
@@ -125,4 +174,12 @@ CREATE TRIGGER update_expenses_updated_at
 
 CREATE TRIGGER update_budgets_updated_at 
   BEFORE UPDATE ON budgets 
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_goals_updated_at 
+  BEFORE UPDATE ON goals 
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_savings_logs_updated_at 
+  BEFORE UPDATE ON savings_logs 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

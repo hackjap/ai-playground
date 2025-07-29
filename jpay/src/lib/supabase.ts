@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { DatabasePair, DatabaseExpense, DatabaseBudget } from '@/types'
+import type { DatabasePair, DatabaseExpense, DatabaseBudget, DatabaseGoal, DatabaseSavingsLog } from '@/types'
 
 // Supabase 환경 변수 (실제 운영 시에는 .env 파일에서 관리)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
@@ -23,6 +23,16 @@ export interface Database {
         Row: DatabaseBudget
         Insert: Omit<DatabaseBudget, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<DatabaseBudget, 'id' | 'created_at'>>
+      }
+      goals: {
+        Row: DatabaseGoal
+        Insert: Omit<DatabaseGoal, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<DatabaseGoal, 'id' | 'created_at'>>
+      }
+      savings_logs: {
+        Row: DatabaseSavingsLog
+        Insert: Omit<DatabaseSavingsLog, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<DatabaseSavingsLog, 'id' | 'created_at'>>
       }
     }
   }
@@ -272,4 +282,195 @@ export async function settleAllCurrentExpenses(pairId: string) {
   }
   
   return data
+}
+
+// 목표 관련 함수들
+export async function getGoals(pairId: string) {
+  const { data, error } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('pair_id', pairId)
+    .order('created_at', { ascending: false })
+  
+  if (error) {
+    throw new Error(`목표 조회 실패: ${error.message}`)
+  }
+  
+  return data
+}
+
+export async function createGoal(goal: Database['public']['Tables']['goals']['Insert']) {
+  const { data, error } = await supabase
+    .from('goals')
+    .insert(goal)
+    .select()
+    .single()
+  
+  if (error) {
+    throw new Error(`목표 생성 실패: ${error.message}`)
+  }
+  
+  return data
+}
+
+export async function updateGoal(id: string, updates: Database['public']['Tables']['goals']['Update']) {
+  const { data, error } = await supabase
+    .from('goals')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) {
+    throw new Error(`목표 수정 실패: ${error.message}`)
+  }
+  
+  return data
+}
+
+export async function deleteGoal(id: string) {
+  const { error } = await supabase
+    .from('goals')
+    .delete()
+    .eq('id', id)
+  
+  if (error) {
+    throw new Error(`목표 삭제 실패: ${error.message}`)
+  }
+}
+
+// 저축 로그 관련 함수들
+export async function getSavingsLogs(goalId: string) {
+  const { data, error } = await supabase
+    .from('savings_logs')
+    .select('*')
+    .eq('goal_id', goalId)
+    .order('date', { ascending: false })
+  
+  if (error) {
+    throw new Error(`저축 내역 조회 실패: ${error.message}`)
+  }
+  
+  return data
+}
+
+export async function createSavingsLog(savingsLog: Database['public']['Tables']['savings_logs']['Insert']) {
+  const { data, error } = await supabase
+    .from('savings_logs')
+    .insert(savingsLog)
+    .select()
+    .single()
+  
+  if (error) {
+    throw new Error(`저축 내역 생성 실패: ${error.message}`)
+  }
+  
+  return data
+}
+
+export async function updateSavingsLog(id: string, updates: Database['public']['Tables']['savings_logs']['Update']) {
+  const { data, error } = await supabase
+    .from('savings_logs')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) {
+    throw new Error(`저축 내역 수정 실패: ${error.message}`)
+  }
+  
+  return data
+}
+
+export async function deleteSavingsLog(id: string) {
+  const { error } = await supabase
+    .from('savings_logs')
+    .delete()
+    .eq('id', id)
+  
+  if (error) {
+    throw new Error(`저축 내역 삭제 실패: ${error.message}`)
+  }
+}
+
+// 특정 목표의 총 저축액 조회
+export async function getTotalSavingsForGoal(goalId: string) {
+  const { data, error } = await supabase
+    .from('savings_logs')
+    .select('amount')
+    .eq('goal_id', goalId)
+  
+  if (error) {
+    throw new Error(`저축 총액 조회 실패: ${error.message}`)
+  }
+  
+  const totalAmount = data.reduce((sum, log) => sum + log.amount, 0)
+  return totalAmount
+}
+
+// Realtime 구독 관련 함수들
+export function subscribeToGoals(pairId: string, callback: (payload: any) => void) {
+  return supabase
+    .channel(`goals:${pairId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'goals',
+        filter: `pair_id=eq.${pairId}`,
+      },
+      callback
+    )
+    .subscribe()
+}
+
+export function subscribeToSavingsLogs(goalId: string, callback: (payload: any) => void) {
+  return supabase
+    .channel(`savings_logs:${goalId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'savings_logs',
+        filter: `goal_id=eq.${goalId}`,
+      },
+      callback
+    )
+    .subscribe()
+}
+
+// 페어의 모든 저축 로그 구독 (모든 목표에 대한 저축 내역)
+export function subscribeToAllSavingsLogsForPair(pairId: string, callback: (payload: any) => void) {
+  return supabase
+    .channel(`all_savings_logs:${pairId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'savings_logs',
+      },
+      async (payload) => {
+        // 저축 로그가 변경될 때, 해당 목표가 이 페어의 것인지 확인
+        const newRecord = payload.new as DatabaseSavingsLog | null
+        const oldRecord = payload.old as DatabaseSavingsLog | null
+        
+        if (newRecord?.goal_id || oldRecord?.goal_id) {
+          const goalId = newRecord?.goal_id || oldRecord?.goal_id
+          const { data: goal } = await supabase
+            .from('goals')
+            .select('pair_id')
+            .eq('id', goalId)
+            .single()
+          
+          if (goal?.pair_id === pairId) {
+            callback(payload)
+          }
+        }
+      }
+    )
+    .subscribe()
 }
