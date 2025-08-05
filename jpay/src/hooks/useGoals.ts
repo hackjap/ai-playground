@@ -15,7 +15,11 @@ export function useGoal(goalId: string | null) {
     queryFn: async () => {
       if (!goalId) return null
       
-      const goals = await getGoals('')
+      // 로컬스토리지에서 pairId 가져오기
+      const pairId = localStorage.getItem('jpay_current_pair_id')
+      if (!pairId) throw new Error('페어 정보를 찾을 수 없습니다')
+      
+      const goals = await getGoals(pairId)
       const goal = goals.find(g => g.id === goalId)
       
       if (!goal) throw new Error('목표를 찾을 수 없습니다')

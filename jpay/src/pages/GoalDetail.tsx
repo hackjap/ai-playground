@@ -1,24 +1,49 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+import { ProgressBar } from '@/components/ui/progress-bar'
 import { formatCurrency } from '@/lib/utils'
+import { calculateRecommendedSavings, formatKoreanWon, getProgressMessage } from '@/lib/goalUtils'
 import { useGoal, useUpdateGoal, useDeleteGoal } from '@/hooks/useGoals'
-import { useSavingsLogs } from '@/hooks/useSavingsLogs'
-import { ArrowLeft, Edit, Trash2, Plus, Calendar, Target, TrendingUp } from 'lucide-react'
+import { useSavingsLogs, useDeleteSavingsLog } from '@/hooks/useSavingsLogs'
+import { useConfetti } from '@/hooks/useConfetti'
+import { ArrowLeft, Edit, Trash2, Plus, Calendar, Target, TrendingUp, MoreVertical, Calculator } from 'lucide-react'
 import SavingsLogForm from '@/components/forms/SavingsLogForm'
 
 export default function GoalDetail() {
   const { id: goalId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [isSavingsFormOpen, setIsSavingsFormOpen] = useState(false)
+  const [editingSavingsLog, setEditingSavingsLog] = useState<any>(null)
+  const [menuOpenLogId, setMenuOpenLogId] = useState<string | null>(null)
   
   const { data: goal, isLoading: isLoadingGoal } = useGoal(goalId || null)
   const { data: savingsLogs, isLoading: isLoadingLogs } = useSavingsLogs(goalId || null)
   const updateGoal = useUpdateGoal()
   const deleteGoal = useDeleteGoal()
+  const deleteSavingsLogMutation = useDeleteSavingsLog()
+  const { triggerGoalAchievementCelebration } = useConfetti()
+
+  // 메뉴 외부 클릭 감지를 위한 ref
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpenLogId(null)
+      }
+    }
+
+    if (menuOpenLogId) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [menuOpenLogId])
 
   const handleCompleteGoal = async () => {
     if (!goal || goal.is_completed) return
@@ -34,6 +59,11 @@ export default function GoalDetail() {
           completed_at: new Date().toISOString()
         }
       })
+      
+      // 목표 완료 축하 애니메이션 트리거
+      setTimeout(() => {
+        triggerGoalAchievementCelebration()
+      }, 500)
     } catch (error) {
       console.error('목표 완료 처리 실패:', error)
       alert('목표 완료 처리에 실패했습니다.')
@@ -57,6 +87,25 @@ export default function GoalDetail() {
 
   const handleSavingsSuccess = () => {
     setIsSavingsFormOpen(false)
+    setEditingSavingsLog(null)
+  }
+
+  const handleEditSavingsLog = (log: any) => {
+    setEditingSavingsLog(log)
+    setMenuOpenLogId(null)
+  }
+
+  const handleDeleteSavingsLog = async (logId: string) => {
+    const confirmDelete = confirm('이 저축 내역을 삭제하시겠습니까?')
+    if (!confirmDelete) return
+
+    try {
+      await deleteSavingsLogMutation.mutateAsync(logId)
+      setMenuOpenLogId(null)
+    } catch (error) {
+      console.error('저축 내역 삭제 실패:', error)
+      alert('저축 내역 삭제에 실패했습니다.')
+    }
   }
 
   if (isLoadingGoal || !goal) {
@@ -72,6 +121,15 @@ export default function GoalDetail() {
   const remainingAmount = Math.max(0, goal.target_amount - goal.currentAmount)
   const remainingDays = goal.deadline 
     ? Math.ceil((new Date(goal.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null
+
+  // 권장 저축액 계산
+  const recommendedSavings = goal.deadline 
+    ? calculateRecommendedSavings(goal.currentAmount, goal.target_amount, new Date(goal.deadline))
+    : null
+
+  const progressMessage = goal.deadline
+    ? getProgressMessage(goal.progressPercentage, recommendedSavings?.remainingMonths || 0, recommendedSavings?.isOverdue || false)
     : null
 
   return (
@@ -108,14 +166,26 @@ export default function GoalDetail() {
             <div className="text-3xl font-bold text-primary-600 mb-2">
               {formatCurrency(goal.currentAmount)}
             </div>
-            <div className="text-muted-foreground">
-              목표 {formatCurrency(goal.target_amount)} 중 {Math.round(goal.progressPercentage)}% 달성
+            <div className="text-muted-foreground mb-2">
+              목표 {formatCurrency(goal.target_amount)} 중
             </div>
+            {progressMessage && (
+              <div className="text-sm font-medium text-primary-700 mb-4">
+                {progressMessage}
+              </div>
+            )}
           </div>
           
-          <Progress value={goal.progressPercentage} className="h-4 mb-4" />
+          <ProgressBar 
+            currentAmount={goal.currentAmount}
+            targetAmount={goal.target_amount}
+            className="mb-6"
+            showPercentage={true}
+            showAmounts={false}
+            onGoalAchieved={!goal.is_completed ? triggerGoalAchievementCelebration : undefined}
+          />
           
-          <div className="grid grid-cols-2 gap-4 text-center">
+          <div className="grid grid-cols-2 gap-4 text-center mb-4">
             <div>
               <div className="text-sm text-muted-foreground">남은 금액</div>
               <div className="text-lg font-semibold">{formatCurrency(remainingAmount)}</div>
@@ -129,6 +199,22 @@ export default function GoalDetail() {
               </div>
             )}
           </div>
+
+          {/* 권장 저축액 표시 */}
+          {recommendedSavings && !goal.is_completed && recommendedSavings.remainingAmount > 0 && (
+            <div className="bg-white/70 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Calculator className="h-4 w-4 text-primary-600" />
+                <span className="text-sm font-medium text-primary-700">월별 권장 저축액</span>
+              </div>
+              <div className="text-2xl font-bold text-primary-600">
+                {formatKoreanWon(recommendedSavings.monthlyAmount)}원
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {recommendedSavings.remainingMonths}개월 동안 매월 저축 시 목표 달성
+              </div>
+            </div>
+          )}
           
           {!goal.is_completed && (
             <div className="flex gap-2 mt-6">
@@ -210,14 +296,49 @@ export default function GoalDetail() {
             <div className="space-y-3">
               {savingsLogs.map((log) => (
                 <div key={log.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                  <div>
+                  <div className="flex-1">
                     <div className="font-medium">{formatCurrency(log.amount)}</div>
                     <div className="text-sm text-muted-foreground">
                       {new Date(log.date).toLocaleDateString()}
                       {log.memo && ` • ${log.memo}`}
                     </div>
                   </div>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    {!goal.is_completed && (
+                      <div className="relative" ref={menuOpenLogId === log.id ? menuRef : null}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setMenuOpenLogId(menuOpenLogId === log.id ? null : log.id)}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                        {menuOpenLogId === log.id && (
+                          <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-md shadow-lg z-10 min-w-[100px]">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start text-left"
+                              onClick={() => handleEditSavingsLog(log)}
+                            >
+                              <Edit className="h-3 w-3 mr-2" />
+                              수정
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start text-left text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteSavingsLog(log.id)}
+                            >
+                              <Trash2 className="h-3 w-3 mr-2" />
+                              삭제
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -226,10 +347,14 @@ export default function GoalDetail() {
       </Card>
 
       {/* Savings Form Modal */}
-      {isSavingsFormOpen && (
+      {(isSavingsFormOpen || editingSavingsLog) && (
         <SavingsLogForm
           goalId={goal.id}
-          onClose={() => setIsSavingsFormOpen(false)}
+          editingLog={editingSavingsLog}
+          onClose={() => {
+            setIsSavingsFormOpen(false)
+            setEditingSavingsLog(null)
+          }}
           onSuccess={handleSavingsSuccess}
         />
       )}

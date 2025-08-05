@@ -1,20 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useCreateSavingsLog } from '@/hooks/useSavingsLogs'
+import { useCreateSavingsLog, useUpdateSavingsLog } from '@/hooks/useSavingsLogs'
 import { formatCurrency } from '@/lib/utils'
 import { X, Wallet } from 'lucide-react'
 
 interface SavingsLogFormProps {
   goalId: string
+  editingLog?: any
   onClose: () => void
   onSuccess: () => void
 }
 
-export default function SavingsLogForm({ goalId, onClose, onSuccess }: SavingsLogFormProps) {
+export default function SavingsLogForm({ goalId, editingLog, onClose, onSuccess }: SavingsLogFormProps) {
   const [formData, setFormData] = useState({
     amount: '',
     date: new Date().toISOString().split('T')[0],
@@ -23,6 +24,19 @@ export default function SavingsLogForm({ goalId, onClose, onSuccess }: SavingsLo
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const createSavingsLog = useCreateSavingsLog()
+  const updateSavingsLog = useUpdateSavingsLog()
+
+  const isEditing = !!editingLog
+
+  useEffect(() => {
+    if (editingLog) {
+      setFormData({
+        amount: editingLog.amount.toString(),
+        date: new Date(editingLog.date).toISOString().split('T')[0],
+        memo: editingLog.memo || ''
+      })
+    }
+  }, [editingLog])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -45,17 +59,28 @@ export default function SavingsLogForm({ goalId, onClose, onSuccess }: SavingsLo
     if (!validateForm()) return
 
     try {
-      await createSavingsLog.mutateAsync({
-        goal_id: goalId,
-        amount: Number(formData.amount),
-        date: new Date(formData.date).toISOString(),
-        memo: formData.memo.trim() || null
-      })
+      if (isEditing) {
+        await updateSavingsLog.mutateAsync({
+          id: editingLog.id,
+          updates: {
+            amount: Number(formData.amount),
+            date: new Date(formData.date).toISOString(),
+            memo: formData.memo.trim() || null
+          }
+        })
+      } else {
+        await createSavingsLog.mutateAsync({
+          goal_id: goalId,
+          amount: Number(formData.amount),
+          date: new Date(formData.date).toISOString(),
+          memo: formData.memo.trim() || null
+        })
+      }
       
       onSuccess()
     } catch (error) {
-      console.error('저축 내역 추가 실패:', error)
-      alert('저축 내역 추가에 실패했습니다. 다시 시도해주세요.')
+      console.error(`저축 내역 ${isEditing ? '수정' : '추가'} 실패:`, error)
+      alert(`저축 내역 ${isEditing ? '수정' : '추가'}에 실패했습니다. 다시 시도해주세요.`)
     }
   }
 
@@ -77,7 +102,7 @@ export default function SavingsLogForm({ goalId, onClose, onSuccess }: SavingsLo
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            저축 추가
+            {isEditing ? '저축 수정' : '저축 추가'}
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -151,9 +176,9 @@ export default function SavingsLogForm({ goalId, onClose, onSuccess }: SavingsLo
               <Button
                 type="submit"
                 className="flex-1"
-                disabled={createSavingsLog.isPending}
+                disabled={createSavingsLog.isPending || updateSavingsLog.isPending}
               >
-                저축 추가
+                {isEditing ? '저축 수정' : '저축 추가'}
               </Button>
             </div>
           </CardContent>
