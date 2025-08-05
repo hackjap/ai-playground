@@ -32,41 +32,114 @@ export default function BudgetForm({
   )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // 실시간 입력값 변경 시 에러 메시지 클리어
+  const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTotalBudget(e.target.value)
+    if (error) setError(null)
+  }
+
+  const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAlertThreshold(e.target.value)
+    if (error) setError(null)
+  }
+
+  const validateInputs = () => {
+    // 예산 금액 검증
+    if (!totalBudget || totalBudget.trim() === '') {
+      return '예산 금액을 입력해주세요.'
+    }
+
+    const budgetNumber = Number(totalBudget)
+    if (isNaN(budgetNumber)) {
+      return '예산 금액은 숫자만 입력 가능합니다.'
+    }
+
+    if (budgetNumber < 0) {
+      return '예산 금액은 0 이상이어야 합니다.'
+    }
+
+    if (budgetNumber > 999999999) {
+      return '예산 금액이 너무 큽니다. (최대 999,999,999원)'
+    }
+
+    // 소수점 검증
+    if (budgetNumber % 1 !== 0) {
+      return '예산 금액은 정수로 입력해주세요.'
+    }
+
+    // 알림 기준 검증
+    if (!alertThreshold || alertThreshold.trim() === '') {
+      return '알림 기준을 입력해주세요.'
+    }
+
+    const thresholdNumber = Number(alertThreshold)
+    if (isNaN(thresholdNumber)) {
+      return '알림 기준은 숫자만 입력 가능합니다.'
+    }
+
+    if (thresholdNumber < 0 || thresholdNumber > 100) {
+      return '알림 기준은 0~100 사이의 숫자를 입력해주세요.'
+    }
+
+    return null
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccessMessage(null)
 
-    if (!totalBudget || isNaN(Number(totalBudget)) || Number(totalBudget) <= 0) {
-      setError('올바른 예산 금액을 입력해주세요.')
-      return
-    }
-
-    if (!alertThreshold || isNaN(Number(alertThreshold)) || Number(alertThreshold) < 0 || Number(alertThreshold) > 100) {
-      setError('알림 기준은 0~100 사이의 숫자를 입력해주세요.')
+    const validationError = validateInputs()
+    if (validationError) {
+      setError(validationError)
       return
     }
 
     setIsLoading(true)
 
     try {
+      // upsert 사용하여 insert/update 자동 처리
       await setBudget({
         pair_id: pairId,
         budget_year: currentYear,
         budget_month: currentMonth,
         total_budget: Number(totalBudget),
-        alert_threshold: Number(alertThreshold) / 100, // 퍼센트를 소수점으로 변환
+        alert_threshold: Number(alertThreshold) / 100,
         category_budgets: currentBudget?.category_budgets || {},
       })
 
-      console.log('예산 설정 완료')
-      onSuccess?.()
+      setSuccessMessage(currentBudget ? '예산이 수정되었습니다.' : '예산이 설정되었습니다.')
+      
+      // 성공 메시지를 잠시 보여준 후 콜백 실행
+      setTimeout(() => {
+        onSuccess?.()
+      }, 1000)
     } catch (err) {
       console.error('예산 설정 실패:', err)
-      setError(err instanceof Error ? err.message : '예산 설정에 실패했습니다.')
+      let errorMessage = '예산 설정에 실패했습니다.'
+      
+      if (err instanceof Error) {
+        if (err.message.includes('network') || err.message.includes('fetch')) {
+          errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.'
+        } else if (err.message.includes('timeout')) {
+          errorMessage = '요청 시간이 초과되었습니다. 다시 시도해주세요.'
+        } else {
+          errorMessage = err.message
+        }
+      }
+      
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleRetry = () => {
+    setError(null)
+    setSuccessMessage(null)
+    handleSubmit({ preventDefault: () => {} } as React.FormEvent)
   }
 
   return (
@@ -96,7 +169,7 @@ export default function BudgetForm({
                   type="number"
                   placeholder="1000000"
                   value={totalBudget}
-                  onChange={(e) => setTotalBudget(e.target.value)}
+                  onChange={handleBudgetChange}
                   className="pr-8"
                   min="0"
                   step="1000"
@@ -122,7 +195,7 @@ export default function BudgetForm({
                   type="number"
                   placeholder="80"
                   value={alertThreshold}
-                  onChange={(e) => setAlertThreshold(e.target.value)}
+                  onChange={handleThresholdChange}
                   className="pr-8"
                   min="0"
                   max="100"
@@ -139,7 +212,27 @@ export default function BudgetForm({
 
             {error && (
               <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
-                {error}
+                <div className="flex items-center justify-between">
+                  <span>{error}</span>
+                  {(error.includes('네트워크') || error.includes('시간') || error.includes('실패')) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRetry}
+                      disabled={isLoading}
+                      className="ml-2 text-red-600 hover:text-red-700"
+                    >
+                      재시도
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+                {successMessage}
               </div>
             )}
 

@@ -233,14 +233,77 @@ export async function getBudget(pairId: string, year: number, month: number) {
 }
 
 export async function setBudget(budget: Database['public']['Tables']['budgets']['Insert']) {
+  // 먼저 기존 예산이 있는지 확인
+  const { data: existingBudget } = await supabase
+    .from('budgets')
+    .select('id')
+    .eq('pair_id', budget.pair_id)
+    .eq('budget_year', budget.budget_year)
+    .eq('budget_month', budget.budget_month)
+    .single()
+
+  if (existingBudget) {
+    // 기존 예산이 있으면 업데이트
+    const { data, error } = await supabase
+      .from('budgets')
+      .update({
+        total_budget: budget.total_budget,
+        alert_threshold: budget.alert_threshold,
+        category_budgets: budget.category_budgets,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingBudget.id)
+      .select()
+      .single()
+    
+    if (error) {
+      throw new Error(`예산 수정 실패: ${error.message}`)
+    }
+    
+    return data
+  } else {
+    // 기존 예산이 없으면 새로 생성
+    const { data, error } = await supabase
+      .from('budgets')
+      .insert(budget)
+      .select()
+      .single()
+    
+    if (error) {
+      throw new Error(`예산 생성 실패: ${error.message}`)
+    }
+    
+    return data
+  }
+}
+
+export async function insertBudget(budget: Database['public']['Tables']['budgets']['Insert']) {
   const { data, error } = await supabase
     .from('budgets')
-    .upsert(budget)
+    .insert(budget)
     .select()
     .single()
   
   if (error) {
-    throw new Error(`예산 설정 실패: ${error.message}`)
+    throw new Error(`예산 생성 실패: ${error.message}`)
+  }
+  
+  return data
+}
+
+export async function updateBudget(
+  budgetId: string, 
+  updates: Database['public']['Tables']['budgets']['Update']
+) {
+  const { data, error } = await supabase
+    .from('budgets')
+    .update(updates)
+    .eq('id', budgetId)
+    .select()
+    .single()
+  
+  if (error) {
+    throw new Error(`예산 수정 실패: ${error.message}`)
   }
   
   return data
